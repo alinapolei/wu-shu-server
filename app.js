@@ -5,6 +5,7 @@ let bodyParser = require("body-parser");
 let cors = require('cors');
 jwt = require("jsonwebtoken");
 validator = require('validator');
+const PORT = process.env.PORT || 5000
 
 secret = "wushuSecret";
 const multer = require('multer');
@@ -432,7 +433,7 @@ app.get('/downloadExcelCompetitionState/:token/:compId/:date', async (req, res) 
 
 
 //start the server
-app.listen(3000, () => {
+app.listen(PORT,() => {
     console.log("Server has been started !!");
     console.log("port 3000");
     console.log("wu-shu project");
