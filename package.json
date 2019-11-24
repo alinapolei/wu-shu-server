@@ -18,9 +18,7 @@
     "util": "^0.12.1",
     "validator": "^11.1.0"
   },
-  "devDependencies": {
-    "bcrypt": "^3.0.6"
-  },
+  "devDependencies": {},
   "scripts": {
     "start": "node app.js"
   }
