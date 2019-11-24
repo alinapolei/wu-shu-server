@@ -1,4 +1,5 @@
 DButilsAzure = require('./dBUtils');
+const cool = require('cool-ascii-faces')
 Constants = require('./constants');
 let app = require("express")();
 let bodyParser = require("body-parser");
@@ -79,6 +80,7 @@ app.use("/private", (req, res, next) => {
 //app options
 app.options('*', cors());
 
+app.get('/cool', (req, res) => res.send(cool()))
 
 app.post("/login", async (req, res) => {
     let ans = await common_user_module.checkUserDetailsForLogin(req.body);
