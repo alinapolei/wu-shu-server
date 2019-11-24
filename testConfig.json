@@ -1,7 +1,0 @@
-{
-  "server": "localhost",
-  "options": {
-    "database": "wushuTests",
-    "encrypt": true
-  }
-}

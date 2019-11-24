@@ -1,6 +1,5 @@
 const common = require("../common/user_module");
-const sysfunc = require("../commonFunc");
-const checkUserData = require("../services/commonExcelDataCheck");
+const sysfunc = require("../commonFunc")
 
 
 function checkDataBeforeRegister(userToRegsiter) {
@@ -55,46 +54,42 @@ function getCoachId(line) {
 function checkUser(user) {
     let err = new Object()
     let collectErr = [];
+    let birthDateSplit = user[Constants.colRegisterUserExcel.birthDate].split('/')
 
     //id user
-    if (!checkUserData.checkIdUser(user[Constants.colRegisterUserExcel.idSportsman]))
+    if (!validator.isInt(user[Constants.colRegisterUserExcel.idSportsman].toString()) || user[Constants.colRegisterUserExcel.idSportsman].toString().length != 9)
         collectErr.push(Constants.errorMsg.idSportmanErr)
-
     //firstname
-    if (!checkUserData.checkFirstNameLastName(user[Constants.colRegisterUserExcel.firstName]))
+
+    if (!validator.matches(user[Constants.colRegisterUserExcel.firstName].toString(), Constants.hebRegex) || user[Constants.colRegisterUserExcel.firstName].toString().length < 1)
         collectErr.push(Constants.errorMsg.firstNameHeb)
 
     //lastname
-    if (!checkUserData.checkFirstNameLastName(user[Constants.colRegisterUserExcel.lastName]))
+    if (!validator.matches(user[Constants.colRegisterUserExcel.lastName].toString(), Constants.hebRegex) || user[Constants.colRegisterUserExcel.lastName].toString().length < 2)
         collectErr.push(Constants.errorMsg.lastNameHeb)
-
     //address
-    if (!checkUserData.checkAddress(user[Constants.colRegisterUserExcel.address]))
+    if (!validator.matches(user[Constants.colRegisterUserExcel.address].toString(), Constants.regexHebrewAndNumbers) || user[Constants.colRegisterUserExcel.address].toString().length < 2)
         collectErr.push(Constants.errorMsg.addressErr)
-/*
     //birthDate
-    if (!checkUserData.checkBirthDate(user[Constants.colRegisterUserExcel.birthDate]))
+    if (birthDateSplit.length != 3 || birthDateSplit[0].length != 2 || birthDateSplit[1].length != 2 || birthDateSplit[2].length != 4)
         collectErr.push(Constants.errorMsg.birthDateErr)
-
-
- */
     //phone
-    if (!checkUserData.checkPhone(user[Constants.colRegisterUserExcel.phone]))
+    if (!validator.isInt(user[Constants.colRegisterUserExcel.phone].toString()) || user[Constants.colRegisterUserExcel.phone].toString().length != 10)
         collectErr.push(Constants.errorMsg.phoneErr)
     //email
-    if (!checkUserData.checkEmail(user[Constants.colRegisterUserExcel.email]))
+    if (!validator.isEmail(user[Constants.colRegisterUserExcel.email].toString()))
         collectErr.push(Constants.errorMsg.emailErr)
     //sportClub
-    if (!checkUserData.checkSportClub(user[Constants.colRegisterUserExcel.sportClub]))
+    if (!validator.isInt(user[Constants.colRegisterUserExcel.sportClub].toString()))
         collectErr.push(Constants.errorMsg.sportClubErr)
     //sex
-    if (!checkUserData.checkSex(user[Constants.colRegisterUserExcel.sex]))
+    if (!(user[Constants.colRegisterUserExcel.sex].toString() in Constants.sexEnum))
         collectErr.push(Constants.errorMsg.sexErr)
     //branch
-    if (!checkUserData.checkSportStyle(user[Constants.colRegisterUserExcel.sportStyle]))
+    if (!(user[Constants.colRegisterUserExcel.sportStyle].toString() in Constants.sportType))
         collectErr.push(Constants.errorMsg.sportTypeErr)
     //id coach
-    if (!checkUserData.checkIdUser(user[Constants.colRegisterUserExcel.idCoach]))
+    if (!validator.isInt(user[Constants.colRegisterUserExcel.idCoach].toString(), {gt: 100000000, lt: 1000000000}))
         collectErr.push(Constants.errorMsg.idCoachErr)
 
     err.errors = collectErr;
@@ -102,7 +97,6 @@ function checkUser(user) {
 
 
 }
-
 
 async function insertSportsmanDB(trans, users, sportsmanDetails, i) {
     return trans.sql(` INSERT INTO user_Sportsman (id, firstname, lastname, phone, email, birthdate, address, sportclub, sex,photo)
@@ -219,4 +213,3 @@ async function sendEmail(users) {
 
 module.exports.registerSportsman = registerSportsman;
 module.exports.checkDataBeforeRegister = checkDataBeforeRegister;
-module.exports.insertPasswordDB=insertPasswordDB;

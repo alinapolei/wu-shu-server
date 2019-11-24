@@ -1,5 +1,4 @@
 function getArrayFromJsonArray(data) {
-    console.log(data);
     var res = [];
     data.forEach(function (row) {
         res.push(getArrayFromJson(row))

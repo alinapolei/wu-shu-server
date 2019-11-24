@@ -1,5 +1,3 @@
-NODE_ENV = 'development';
-
 DButilsAzure = require('./dBUtils');
 Constants = require('./constants');
 let app = require("express")();
@@ -9,16 +7,14 @@ jwt = require("jsonwebtoken");
 validator = require('validator');
 
 secret = "wushuSecret";
+const multer = require('multer');
 let schedule = require('node-schedule');
-
 
 global.__basedir = __dirname;
 
 let id, access;
-let userIdPic;
 bcrypt = require('bcrypt');
 saltRounds = 10;
-
 
 //import all modules
 const common_couches_module = require("./implementation/common/couches_module");
@@ -40,20 +36,87 @@ const sportsman_user_module = require("./implementation/sportsman/user_module");
 common_function = require("./implementation/commonFunc");
 const excelCreation = require("./implementation/services/excelCreation");
 
-const multer = require('multer');
-
 //uploade file const
-const storagePhoto = multer.diskStorage({
+/*const storagePhoto = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, __basedir + '/resources/profilePics/')
+        cb(null, __basedir + '/resources/profilePic/')
     },
     filename: (req, file, cb) => {
-        cb(null, String("userIdPic" + ".jpeg"))
+        cb(null, String(id + ".jpeg"))
     }
 });
-const uploadProfilePic = multer({storage: storagePhoto}).single("profileImage");
+const uploadProfilePic = multer({storage: storagePhoto});
 
 
+ */
+
+//server schedule Jobs
+let automaticCloseCompetition = schedule.scheduleJob({hour: 2}, function () {
+    manger_competition_module.autoCloseRegCompetition();
+});
+
+//app uses
+app.use(bodyParser.urlencoded({extend: true}));
+app.use(bodyParser.json());
+app.use(cors());
+app.use("/private", (req, res, next) => {
+    const token = req.header("x-auth-token");
+    if (!token) res.status(401).send("Access denied. No token provided.");
+    try {
+        const decoded = jwt.verify(token, secret);
+        req.decoded = decoded;
+
+        access = jwt.decode(req.header("x-auth-token")).access;
+        id = jwt.decode(req.header("x-auth-token")).id;
+
+        next();
+    } catch (exception) {
+        res.status(400).send("Invalid token. Permission denied");
+    }
+});
+
+
+//app options
+app.options('*', cors());
+
+
+app.post("/login", async (req, res) => {
+    let ans = await common_user_module.checkUserDetailsForLogin(req.body);
+    if (!ans.isPassed)
+        res.status(Constants.statusCode.unauthorized).send(ans.err);
+    else {
+        let userDetails = await common_user_module.getUserDetails(ans);
+        let token = common_user_module.buildToken(userDetails, ans);
+        res.status(Constants.statusCode.ok).send(token)
+    }
+});
+
+app.post("/private/registerSportsman", async function (req, res) {
+    if (access === Constants.userType.MANAGER || access === Constants.userType.COACH) {
+        let ans = await coach_user_module.checkDataBeforeRegister(common_function.getArrayFromJsonArray(req.body))
+        if (ans.users.length === 0) {
+            ans.status = Constants.statusCode.badRequest;
+            ans.results = [{line: 0, errors: [Constants.errorMsg.emptyExcel]}];
+            res.status(ans.status).send(ans.results);
+        } else if (ans.isPassed) {
+            ans = await coach_user_module.registerSportsman(ans.users);
+            res.status(ans.status).send(ans.results);
+        } else
+            res.status(Constants.statusCode.badRequest).send(ans.results);
+    } else
+        res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.accessDenied);
+});
+
+/*
+app.post("/private/registerCoach", function (req, res) {
+    if (access === userType.MANAGER)
+        manger_user_module._registerCoach(req, res);
+    else
+        res.status(400).send("Permission denied")
+
+});
+
+ */
 /*
 app.post('/private/uploadPhoto', uploadProfilePic.single("userProfilePic"), async (req, res) => {
     let ans;
@@ -95,92 +158,7 @@ app.post('/private/uploadInsurance', uploadInsurances.single("userInsurance"), (
 
  */
 
-//server schedule Jobs
-let automaticCloseCompetition = schedule.scheduleJob({hour: 2}, function () {
-    manger_competition_module.autoCloseRegCompetition();
-});
 
-//app uses
-app.use(bodyParser.urlencoded({extend: true}));
-app.use(bodyParser.json());
-app.use(cors());
-app.use("/private", (req, res, next) => {
-    const token = req.header("x-auth-token");
-    if (!token) res.status(401).send("Access denied. No token provided.");
-    else {
-        try {
-            const decoded = jwt.verify(token, secret);
-            req.decoded = decoded;
-
-            access = jwt.decode(req.header("x-auth-token")).access;
-            id = jwt.decode(req.header("x-auth-token")).id;
-
-            next();
-        } catch (exception) {
-            res.status(400).send("Invalid token. Permission denied");
-        }
-    }
-});
-
-
-//app options
-app.options('*', cors());
-
-
-app.post("/login", async (req, res) => {
-    let ans = await common_user_module.checkUserDetailsForLogin(req.body);
-    if (!ans.isPassed)
-        res.status(Constants.statusCode.unauthorized).send(ans.err);
-    else {
-        let userDetails = await common_user_module.getUserDetails(ans);
-        let token = common_user_module.buildToken(userDetails, ans);
-        res.status(Constants.statusCode.ok).send(token)
-    }
-});
-
-app.post("/private/registerSportsman", async function (req, res) {
-    if (access === Constants.userType.MANAGER || access === Constants.userType.COACH) {
-        let ans = await coach_user_module.checkDataBeforeRegister(common_function.getArrayFromJsonArray(req.body))
-        if (ans.users.length === 0) {
-            ans.status = Constants.statusCode.badRequest;
-            ans.results = [{line: 0, errors: [Constants.errorMsg.emptyExcel]}];
-            res.status(ans.status).send(ans.results);
-        } else if (ans.isPassed) {
-            ans = await coach_user_module.registerSportsman(ans.users);
-            res.status(ans.status).send(ans.results);
-        } else
-            res.status(Constants.statusCode.badRequest).send(ans.results);
-    } else
-        res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.accessDenied);
-});
-
-app.post("/private/uploadUserProfileImage", function (req, res) {
-    uploadProfilePic(req, res, function (err) {
-        if (err)
-            console.log(err)
-    })
-    console.log("ok")
-    res.send("ok")
-})
-app.post("/private/registerCoach", async function (req, res) {
-    if (access === Constants.userType.MANAGER) {
-        let ans = manger_user_module.checkDataBeforeRegister(common_function.getArrayFromJsonArray(req.body))
-        if (ans.users.length === 0) {
-            ans.status = Constants.statusCode.badRequest;
-            ans.results = [{line: 0, errors: [Constants.errorMsg.emptyExcel]}];
-            res.status(ans.status).send(ans.results);
-        } else if (ans.isPassed) {
-            ans = await manger_user_module.registerCoaches(ans.users);
-            res.status(ans.status).send(ans.results);
-        } else
-            res.status(Constants.statusCode.badRequest).send(ans.results);
-    } else
-        res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.badRequest)
-
-});
-
-
-// excel download
 app.get('/downloadExcelFormatSportsman/:token', async (req, res) => {
     let token = req.params.token;
     const decoded = jwt.verify(token, secret);
@@ -191,7 +169,6 @@ app.get('/downloadExcelFormatSportsman/:token', async (req, res) => {
     if (access == Constants.userType.COACH) {
         clubs = await common_sportclub_module.getSportClubs(id)
         coaches = await common_couches_module.getCoachProfileById(id);
-        coaches.results =[coaches.results];
     } else if (access == Constants.userType.MANAGER) {
         clubs = await common_sportclub_module.getSportClubs(undefined);
         coaches = await common_couches_module.getCoaches();
@@ -204,6 +181,8 @@ app.get('/downloadExcelFormatSportsman/:token', async (req, res) => {
 
 
 });
+
+/*
 app.get('/downloadExcelFormatCoach/:token', async (req, res) => {
     let token = req.params.token;
     const decoded = jwt.verify(token, secret);
@@ -212,11 +191,16 @@ app.get('/downloadExcelFormatCoach/:token', async (req, res) => {
     if (access === Constants.userType.MANAGER) {
         clubs = await common_sportclub_module.getSportClubs(undefined);
         let excelFile = await excelCreation.createExcelRegisterCoaches(clubs.results);
+
         res.download(excelFile);
-    } else
+
+    }
+    else
         res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.accessDenied);
 
 });
+*/
+
 app.get('/downloadExcelFormatRegisterToCompetition/:token/:compId', async (req, res) => {
     let token = req.params.token
     const decoded = jwt.verify(token, secret);
@@ -234,59 +218,6 @@ app.get('/downloadExcelFormatRegisterToCompetition/:token/:compId', async (req, 
     res.download(excelFile);
 
 });
-app.get('/downloadExcelCompetitionState/:token/:compId/:date', async (req, res) => {
-    let token = req.params.token;
-    const decoded = jwt.verify(token, secret);
-    access = decoded.access;
-    id = decoded.id;
-    let data;
-    if (access == Constants.userType.MANAGER) {
-        data = await manger_competition_module.getRegistrationState(req.params.compId);
-    } else
-        res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.accessDenied)
-
-    data = data.results;
-    let excelFile = await excelCreation.createExcelCompetitionState(data, req.params.date);
-
-    res.download(excelFile);
-
-
-});
-
-
-app.post("/private/regExcelCompetitionSportsmen", async function (req, res) {
-    let ans;
-    if (access == Constants.userType.COACH || access == Constants.userType.MANAGER) {
-        let sportsmenArr = common_function.getArrayFromJsonArray(req.body.sportsman);
-        let categoryData = await common_sportsman_module.getCategories();
-        let sportsmen = common_competition_module.fixCategoryExcelData(sportsmenArr);
-        ans = common_competition_module.cheackExcelData(sportsmenArr, categoryData.results);
-        if (sportsmenArr.length == 0)
-            res.status(Constants.statusCode.badRequest).send([{error: Constants.errorMsg.emptyExcel}])
-        else {
-            if (ans.pass) {
-                let delSportsman = common_competition_module.getIdsForDelete(sportsmenArr)
-                ans = await common_competition_module.excelDelSportsmenDB(delSportsman, req.body.compId);
-                if (ans.pass)
-                    ans = await common_competition_module.regExcelSportsmenCompDB(sportsmen, req.body.compId);
-
-                res.status(ans.status).send(ans.results)
-            } else
-                res.status(Constants.statusCode.badRequest).send(ans.results)
-        }
-    } else
-        res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.accessDenied);
-});
-
-app.post("/private/getCoachProfile", async function (req, res) {
-    let ans;
-    if (req.body.id !== undefined)
-        ans = await common_couches_module.getCoachProfileById(req.body.id);
-    else
-        ans = await common_couches_module.getCoachProfileById(id);
-    res.status(ans.status).send(ans.results)
-});
-
 
 app.post("/private/changePassword", async function (req, res) {
     let userData = {
@@ -392,6 +323,29 @@ app.post("/private/competitionSportsmen", async function (req, res) {
         ans = await common_competition_module.registerSportsmenToCompetition(req.body.insertSportsman, req.body.deleteSportsman, req.body.updateSportsman, req.body.compId);
     res.status(ans.status).send(ans.results)
 });
+app.post("/private/regExcelCompetitionSportsmen", async function (req, res) {
+    let ans;
+    if (access == Constants.userType.COACH || access == Constants.userType.MANAGER) {
+        let sportsmenArr = common_function.getArrayFromJsonArray(req.body.sportsman);
+        let categoryData = await common_sportsman_module.getCategories();
+        let sportsmen = common_competition_module.fixCategoryExcelData(sportsmenArr);
+        ans = common_competition_module.cheackExcelData(sportsmenArr, categoryData.results);
+        if (sportsmenArr.length == 0)
+            res.status(Constants.statusCode.badRequest).send([{error: Constants.errorMsg.emptyExcel}])
+        else {
+            if (ans.pass) {
+                let delSportsman = common_competition_module.getIdsForDelete(sportsmenArr)
+                ans = await common_competition_module.excelDelSportsmenDB(delSportsman, req.body.compId);
+                if (ans.pass)
+                    ans = await common_competition_module.regExcelSportsmenCompDB(sportsmen, req.body.compId);
+
+                res.status(ans.status).send(ans.results)
+            } else
+                res.status(Constants.statusCode.badRequest).send(ans.results)
+        }
+    } else
+        res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.accessDenied);
+});
 
 app.post("/private/deleteSportsmanProfile", async function (req, res) {
     if (access === Constants.userType.MANAGER || id === req.body.userID) {
@@ -457,15 +411,25 @@ app.post("/private/updateCompetitionDetails", async function (req, res) {
     } else
         res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.accessDenied)
 })
-
-app.post("/private/deleteCoachProfile", async function (req, res) {
-    if (access === Constants.userType.MANAGER) {
-        let ans = await manger_user_module.deleteCoach(req.body.userID)
-        res.status(ans.status).send(ans.results)
+app.get('/downloadExcelCompetitionState/:token/:compId/:date', async (req, res) => {
+    let token = req.params.token;
+    const decoded = jwt.verify(token, secret);
+    access = decoded.access;
+    id = decoded.id;
+    let data;
+    if (access == Constants.userType.MANAGER) {
+        data = await manger_competition_module.getRegistrationState(req.params.compId);
     } else
-        res.status(Constants.statusCode.unauthorized).send(Constants.errorMsg.accessDenied);
+        res.status(Constants.statusCode.badRequest).send(Constants.errorMsg.accessDenied)
 
-})
+    data = data.results;
+    let excelFile = await excelCreation.createExcelCompetitionState(data, req.params.date);
+
+    res.download(excelFile);
+
+
+});
+
 
 //start the server
 app.listen(3000, () => {
@@ -474,5 +438,3 @@ app.listen(3000, () => {
     console.log("wu-shu project");
     console.log("----------------------------------");
 });
-
-module.exports = app;
